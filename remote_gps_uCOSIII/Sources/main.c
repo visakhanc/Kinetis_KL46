@@ -73,6 +73,7 @@ void LedTask(void *pArg);
 void disp_task(void *pArg);
 
 
+
 int main(void)
 {
 	int err;
@@ -140,6 +141,7 @@ int main(void)
 
 void LedTask(void *pArg)
 {
+	/* This task blinks Red LED */
 	while(1) {
 		GPIO_DRV_SetPinOutput(kGpioLED2);
 		OSA_TimeDelay(1000);
