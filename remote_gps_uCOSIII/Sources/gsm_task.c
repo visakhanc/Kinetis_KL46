@@ -363,7 +363,7 @@ void control_task(void *pArg)
 								len = message_update_error("Lookup failed\r\n", len);
 								if(0 != gsm_send_sms(gsm_tx_buf, len, gsm_status.caller))
 								{
-									debug_printf("\nSMS failed\r\n");
+									debug_printf("\nSMS failed!\r\n");
 								}
 							}
 
