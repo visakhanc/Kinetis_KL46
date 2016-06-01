@@ -4,8 +4,8 @@
 <stringAttribute key="com.pemicro.debug.gdbjtag.pne.PE.GDB_IP" value="127.0.0.1"/>
 <stringAttribute key="com.pemicro.debug.gdbjtag.pne.PE.GDB_OPTIONS" value=""/>
 <stringAttribute key="com.pemicro.debug.gdbjtag.pne.PE.GDB_PORT" value="7224"/>
-<intAttribute key="com.pemicro.debug.gdbjtag.pne.PE.HARDWARE_INTERFACE" value="0"/>
-<stringAttribute key="com.pemicro.debug.gdbjtag.pne.PE.LAST_ATTRIBUTE_HEADER" value="com.pemicro.debug.gdbjtag.pne.ml."/>
+<intAttribute key="com.pemicro.debug.gdbjtag.pne.PE.HARDWARE_INTERFACE" value="6"/>
+<stringAttribute key="com.pemicro.debug.gdbjtag.pne.PE.LAST_ATTRIBUTE_HEADER" value="com.pemicro.debug.gdbjtag.pne.sda."/>
 <booleanAttribute key="com.pemicro.debug.gdbjtag.pne.PE.USE_EXTERNAL_SERVER" value="true"/>
 <intAttribute key="com.pemicro.debug.gdbjtag.pne.algorithmIndex" value="0"/>
 <stringAttribute key="com.pemicro.debug.gdbjtag.pne.alternativeAlgorithmPath" value=""/>
@@ -62,6 +62,22 @@
 <stringAttribute key="com.pemicro.debug.gdbjtag.pne.preserveMemoryTo2" value="3"/>
 <booleanAttribute key="com.pemicro.debug.gdbjtag.pne.preservePartioning" value="false"/>
 <booleanAttribute key="com.pemicro.debug.gdbjtag.pne.programtrim" value="false"/>
+<booleanAttribute key="com.pemicro.debug.gdbjtag.pne.sda.ALWAYS_ERASE" value="false"/>
+<stringAttribute key="com.pemicro.debug.gdbjtag.pne.sda.CYCLONE_IP" value=""/>
+<booleanAttribute key="com.pemicro.debug.gdbjtag.pne.sda.DO_RESET_DELAY" value="false"/>
+<intAttribute key="com.pemicro.debug.gdbjtag.pne.sda.INTERFACE_PORT" value="0"/>
+<stringAttribute key="com.pemicro.debug.gdbjtag.pne.sda.INTERFACE_PORT_STRING" value="USB1"/>
+<stringAttribute key="com.pemicro.debug.gdbjtag.pne.sda.NETWORK_CARD_IP" value=""/>
+<stringAttribute key="com.pemicro.debug.gdbjtag.pne.sda.POWER_DOWN_DELAY" value=""/>
+<booleanAttribute key="com.pemicro.debug.gdbjtag.pne.sda.POWER_OFF" value="false"/>
+<stringAttribute key="com.pemicro.debug.gdbjtag.pne.sda.POWER_UP_DELAY" value=""/>
+<booleanAttribute key="com.pemicro.debug.gdbjtag.pne.sda.PROVIDE_POWER" value="false"/>
+<intAttribute key="com.pemicro.debug.gdbjtag.pne.sda.REGULATOR_VOLTAGE" value="0"/>
+<stringAttribute key="com.pemicro.debug.gdbjtag.pne.sda.RESET_DELAY" value="0"/>
+<stringAttribute key="com.pemicro.debug.gdbjtag.pne.sda.SHIFT_FREQ" value="5000"/>
+<booleanAttribute key="com.pemicro.debug.gdbjtag.pne.sda.SPECIFY_IP" value="false"/>
+<booleanAttribute key="com.pemicro.debug.gdbjtag.pne.sda.SPECIFY_NETWORK_CARD" value="false"/>
+<booleanAttribute key="com.pemicro.debug.gdbjtag.pne.sda.STARTUP_USE_SWD" value="true"/>
 <intAttribute key="com.pemicro.debug.gdbjtag.pne.swoEnableTargetCpuFreq" value="0"/>
 <stringAttribute key="com.pemicro.debug.gdbjtag.pne.swoEnableTargetPortMask" value="0x1"/>
 <intAttribute key="com.pemicro.debug.gdbjtag.pne.swoEnableTargetSwoFreq" value="0"/>
@@ -91,11 +107,11 @@
 <intAttribute key="org.eclipse.cdt.launch.ATTR_BUILD_BEFORE_LAUNCH_ATTR" value="2"/>
 <stringAttribute key="org.eclipse.cdt.launch.DEBUGGER_REGISTER_GROUPS" value=""/>
 <stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="Debug/remote_gps_ucosiii.elf"/>
-<stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="remote_gps_ucosiii"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="remote_gps_uCOSIII"/>
 <booleanAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_AUTO_ATTR" value="false"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_ID_ATTR" value=""/>
 <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
-<listEntry value="/remote_gps_ucosiii"/>
+<listEntry value="/remote_gps_uCOSIII"/>
 </listAttribute>
 <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
 <listEntry value="4"/>

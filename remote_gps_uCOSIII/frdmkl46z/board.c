@@ -68,6 +68,7 @@ const clock_manager_user_config_t g_defaultClockConfigVlpr =
     }
 };
 
+
 /* Configuration for enter RUN mode. Core clock = 48MHz. */
 const clock_manager_user_config_t g_defaultClockConfigRun =
 {

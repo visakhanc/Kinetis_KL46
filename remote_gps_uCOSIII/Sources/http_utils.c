@@ -63,9 +63,8 @@ int http_get(const char *url)
 		}
 	}
 
-	debug_printf("\n\rread http");
-
 	if(0 == ret) {
+		debug_printf("\n\rread http");
 		gsm_send_command("AT+HTTPACTION=0");
 		result = OSA_EventWait(&gsm_event, EVENT_GSM_OK|EVENT_GSM_ERROR, false, 2*1000, &res_event);
 		if(kStatus_OSA_Success == result) {
@@ -252,7 +251,7 @@ int http_terminate(void)
 }
 
 
-/* Read some bytes from the currently received http page at this offset into the buffer */
+/* Read 'size' bytes from the currently received http page in SIM900 at 'offset' bytes into the given buffer */
 int http_read(uint8_t *buf, int offset, int size)
 {
 	uint32_t result;

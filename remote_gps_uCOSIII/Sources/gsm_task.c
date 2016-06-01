@@ -21,11 +21,13 @@
 extern void UART2_IRQHandler(void);
 extern int message_update_gpsdata(void);
 extern int message_update_location(int offset);
+extern int message_update_error(const char *err, int len);
 extern int gsm_send_command(const char *cmd);
 extern void print_tx_data(void);
 extern int gsm_send_sms(const uint8_t *buf, int length, const char *address);
 extern int http_get(const char *url);
 extern int http_find_string(const char* str, char *page_buf, int bufsize);
+
 static void gsm_uart_rx_handler(uint32_t instance, void *state);
 
 static char maps_api_url[100] = "http://maps.googleapis.com/maps/api/geocode/json?latlng=12.92736,77.60729";
@@ -335,7 +337,7 @@ void control_task(void *pArg)
 				len = message_update_gpsdata();
 
 				/* Lookup reverse geocoding url only if resonably accurate */
-				if((gps_info.fix > NO_FIX) &&  (gps_info.hdop < 1.1)) {
+				if((gps_info.fix > NO_FIX) &&  (gps_info.hdop < 2.0)) {
 					if(0 == http_open_context()) {
 						if(0 == http_init()) {
 							if(0 == http_get(maps_api_url)) {
@@ -357,6 +359,12 @@ void control_task(void *pArg)
 							}
 							else {
 								debug_printf("\nLookup failed\n\r");
+								/* update error detail in message and send message */
+								len = message_update_error("Lookup failed\r\n", len);
+								if(0 != gsm_send_sms(gsm_tx_buf, len, gsm_status.caller))
+								{
+									debug_printf("\nSMS failed\r\n");
+								}
 							}
 
 							http_terminate();
@@ -551,6 +559,7 @@ int message_update_gpsdata(void)
 	offset += sprintf(&gsm_tx_buf[offset], "%s\r\n", str);
 	offset += sprintf(&gsm_tx_buf[offset], "Dir:%d deg\r\n", gps_info.course);
 	offset += sprintf(&gsm_tx_buf[offset], "Speed:%d kph\r\n", gps_info.velocity);
+	offset += sprintf(&gsm_tx_buf[offset], "HDOP:%d\r\n", (int)(gps_info.hdop*10.0));
 
 	return offset;
 }
@@ -582,6 +591,12 @@ int message_update_location(int offset)
 	return offset;
 }
 
+int message_update_error(const char *err, int len)
+{
+	int offset = len;
+	offset += sprintf(&gsm_tx_buf[len], "%s", err);
+	return offset;
+}
 void print_tx_data(void)
 {
 	debug_printf("\n\r");

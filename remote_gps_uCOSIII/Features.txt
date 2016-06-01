@@ -1,0 +1,12 @@
+To be included :
+
+1. Use eComapass of FRDM-KL46 instead of GPS heading
+	update: Not needed, gps heading is accurate enough when in motion
+2. LCD for debugging/status
+3. Log errors
+4. Power supply - use switching regulator
+
+.....
+
+Last-1. App based monitoring
+Last. Remote upgrade
