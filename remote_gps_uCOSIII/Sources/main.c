@@ -38,9 +38,11 @@
 #include "fsl_smc_hal.h"
 #include "common.h"
 #include "gps_parse.h"
+#include "seg_lcd.h"
+#include "fsl_port_hal.h"
 
 #define LED_TASK_STACKSIZE  256
-#define LED_TASK_PRIO		4  /* uC-OSIII priority=4+2=6 */
+#define LED_TASK_PRIO		5  /* uC-OSIII priority=4+2=6 */
 
 #define GPS_TASK_STACKSIZE	1024
 #define GPS_TASK_PRIO		4
@@ -67,6 +69,7 @@ OSA_TASK_DEFINE(disp_task, DISP_TASK_STACKSIZE);
 extern void gps_task(void *pArg);
 extern void gsm_rx_task(void *pArg);
 extern void control_task(void *pArg);
+extern void PORTC_PORTD_IRQHandler(void);
 
 void hardware_init(void);
 void LedTask(void *pArg);
@@ -84,7 +87,8 @@ int main(void)
     SMC_HAL_SetProtection(SMC_BASE_PTR, kAllowPowerModeVlp);
 
 	/* Initialize gpio input and output pins */
-	GPIO_DRV_Init(&switchPins, &ledPins);
+	GPIO_DRV_Init(switchPins, ledPins);
+	slcd_init();
 
 	PRINTF("Initializing\n\r");
 
@@ -106,11 +110,13 @@ int main(void)
 	}
 #endif
 
+#if 1
 	err = OSA_TaskCreate(control_task, "control", CONTROL_TASK_STACKSIZE, control_task_stack, CONTROL_TASK_PRIO, (task_param_t)0,
 							false, &control_task_task_handler);
 	if(err != kStatus_OSA_Success) {
 		PRINTF("Failed to create control task\r\n");
 	}
+#endif
 
 #if 1
 	err = OSA_TaskCreate(gsm_rx_task, "gsm_rx", GSM_RX_TASK_STACKSIZE, gsm_rx_task_stack, GSM_RX_TASK_PRIO, (task_param_t)0,
@@ -141,25 +147,49 @@ int main(void)
 
 void LedTask(void *pArg)
 {
+	uint32_t 	sec = 0, hr = 0, min = 0;
+
 	/* This task blinks Red LED */
 	while(1) {
-		GPIO_DRV_SetPinOutput(kGpioLED2);
-		OSA_TimeDelay(1000);
-		GPIO_DRV_ClearPinOutput(kGpioLED2);
+
+		GPIO_DRV_TogglePinOutput(kGpioLED2);
 		OSA_TimeDelay(1000);
 	}
+
 }
 
-void hardware_init(void) {
 
+
+void hardware_init(void)
+{
   /* enable clock for PORTs */
   CLOCK_SYS_EnablePortClock(PORTA_IDX);
   CLOCK_SYS_EnablePortClock(PORTB_IDX);
   CLOCK_SYS_EnablePortClock(PORTE_IDX);
+  CLOCK_SYS_EnablePortClock(PORTC_IDX);
 
   /* Init board clock */
   BOARD_ClockInit();
   dbg_uart_init();
+}
+
+
+
+/* IRQ Handler for user switches */
+void PORTC_PORTD_IRQHandler(void)
+{
+	/* SW1 caused interrupt? */
+	if(PORT_HAL_IsPinIntPending(SW1_PORT, SW1_PIN)) {
+		GPIO_DRV_TogglePinOutput(kGpioLED1);
+	}
+
+	/* SW3 caused interrupt? */
+	if(PORT_HAL_IsPinIntPending(SW3_PORT, SW3_PIN)) {
+		GPIO_DRV_TogglePinOutput(kGpioLED2);
+	}
+
+	/* Clear interrupt flags for both SW1 and SW3 */
+	PORT_HAL_ClearPortIntFlag(SW3_PORT);
 }
 
 #if ENABLE_DISP_TASK

@@ -42,11 +42,8 @@ gpio_input_pin_user_config_t switchPins[] = {
         .config.isPullEnable = true,
         .config.pullSelect = kPortPullUp,
         .config.isPassiveFilterEnabled = false,
-        .config.interrupt = kPortIntDisabled,
+        .config.interrupt = kPortIntRisingEdge,
     },
-	/*
-	//Disabled since the interrupt is not properly handled when using MQX and causes MQX to stall at power-up.
-	// Install an MQX ISR Handler for this interrupt if using MQX (If MQX is not used, uncomment this)
     {
         .pinName = kGpioSW3,
         .config.isPullEnable = true,
@@ -54,7 +51,6 @@ gpio_input_pin_user_config_t switchPins[] = {
         .config.isPassiveFilterEnabled = false,
         .config.interrupt = kPortIntRisingEdge
     },
-    */
 	{
 		.pinName = kGpioGPSFix,
 		.config.isPullEnable = true,

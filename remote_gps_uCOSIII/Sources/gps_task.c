@@ -18,21 +18,17 @@
 extern void UART1_IRQHandler(void);
 static void gps_uart_rx_handler(uint32_t instance, void *state);
 
-static uint8_t 	gps_rx_buf[2], gps_rx_sentence[200];
-static uint32_t	gps_rx_len;
+static uint8_t gps_rx_buf[2], gps_rx_sentence[200];
+static uint32_t gps_rx_len;
 static semaphore_t gps_task_sem;
 gps_info_struct gps_info;
 uart_state_t gps_uart_state;
 
-
-const uart_user_config_t gps_uart_config =
-{
-	.baudRate = 9600,
-	.bitCountPerChar = kUart8BitsPerChar,
-	.parityMode = kUartParityDisabled,
-	.stopBitCount = kUartOneStopBit
-};
-
+const uart_user_config_t gps_uart_config = {
+												.baudRate = 9600,
+												.bitCountPerChar = kUart8BitsPerChar,
+												.parityMode = kUartParityDisabled,
+												.stopBitCount = kUartOneStopBit };
 
 /*
  *  Initialize GPS
@@ -59,74 +55,62 @@ int gps_init(void)
 	return 0;
 }
 
-
-
-
 /*TASK*-----------------------------------------------------
-*
-* Task Name    : gps_task
-* Comments     :
-*
-*
-*END*-----------------------------------------------------*/
+ *
+ * Task Name    : gps_task
+ * Comments     :
+ *
+ *
+ *END*-----------------------------------------------------*/
 
 void gps_task(void *pArg)
 {
 
-   char rx_sentence[200];
-   char *data_ptr;
-   uint32_t len;
-   char c;
+	char rx_sentence[200];
+	char *data_ptr;
+	uint32_t len;
+	char c;
 
-   debug_printf("from gps task...\r\n");
+	debug_printf("from gps task...\r\n");
 
-   /* Initialize GPS */
-   gps_init();
+	/* Initialize GPS */
+	gps_init();
 
-   /* Turn on GREEN LED */
-   //GPIO_DRV_ClearPinOutput(kGpioLED1);
+	/* Turn on GREEN LED */
+	//GPIO_DRV_ClearPinOutput(kGpioLED1);
+	while (1) {
 
-   while(1)
-   {
+		/* Wait for signal from UART Rx handler */
+		if (kStatus_OSA_Success == OSA_SemaWait(&gps_task_sem, OSA_WAIT_FOREVER)) {
+			/* Copy the received sentence */
+			len = gps_rx_len;
+			memcpy((void *) rx_sentence, (void *) gps_rx_sentence, len);
 
-	   /* Wait for signal from UART Rx handler */
-	   if(kStatus_OSA_Success == OSA_SemaWait(&gps_task_sem, OSA_WAIT_FOREVER))
-	   {
-		   /* Copy the received sentence */
-		   len = gps_rx_len;
-		   memcpy((void *)rx_sentence, (void *)gps_rx_sentence, len);
+			/* Parse the received sentence to update gps_info structure */
+			if (NULL != strstr(rx_sentence, "GPGGA")) {
+				data_ptr = &rx_sentence[6];
+				gps_parse_gga(data_ptr, &gps_info);
+			}
 
-		   /* Parse the received sentence to update gps_info structure */
-		   if(NULL != strstr(rx_sentence, "GPGGA"))
-		   {
-			   data_ptr = &rx_sentence[6];
-			   gps_parse_gga(data_ptr, &gps_info);
-		   }
+			if ((NULL != strstr(rx_sentence, "GPRMC")) || (NULL != strstr(rx_sentence, "GNRMC"))) {
+				data_ptr = &rx_sentence[6];
+				gps_parse_rmc(data_ptr, &gps_info);
+			}
+		}
 
-		   if( (NULL != strstr(rx_sentence, "GPRMC")) || (NULL != strstr(rx_sentence, "GNRMC")) )
-		   {
-			   data_ptr = &rx_sentence[6];
-			   gps_parse_rmc(data_ptr, &gps_info);
-		   }
-	   }
+		/* Check for GPS Fix */
+		if (NO_FIX != gps_info.fix) {
+			/* Turn on GREEN LED */
+			GPIO_DRV_ClearPinOutput(kGpioLED1);
+		}
+		else {
+			/* Turn off GREEN LED */
+			GPIO_DRV_SetPinOutput(kGpioLED1);
+		}
 
-
-	   /* Check for GPS Fix */
-	   if(NO_FIX != gps_info.fix)
-	   {
-		   /* Turn on GREEN LED */
-		   GPIO_DRV_ClearPinOutput(kGpioLED1);
-	   }
-	   else
-	   {
-		   /* Turn off GREEN LED */
-		   GPIO_DRV_SetPinOutput(kGpioLED1);
-	   }
-
-   }
+	}
 
 }
-
 
 /*
  * 	UART Rx handler for GPS UART
@@ -138,24 +122,23 @@ void gps_task(void *pArg)
  */
 static void gps_uart_rx_handler(uint32_t instance, void *state)
 {
-	static uint32_t buf_index;
-	static uint8_t  prev_ch;
-	uart_state_t * 	u_state = (uart_state_t *)state;
-	uint8_t			ch;
+	static uint32_t buf_n;
+	static uint8_t prev_ch;
+	uart_state_t * u_state = (uart_state_t *) state;
+	uint8_t ch;
 
 	ch = *(u_state->rxBuff);
 
-	if('$' == ch)
-	{
-		buf_index = 0;
+	if ('$' == ch) {
+		buf_n = 0;
 	}
-	else
-	{
-		gps_rx_sentence[buf_index++] = ch;
-		if( ('\n' == ch) && (prev_ch == '\r') )
-		{
-			gps_rx_len = buf_index;
-			OSA_SemaPost(&gps_task_sem);
+	else {
+		if (buf_n < sizeof(gps_rx_sentence)) {
+			gps_rx_sentence[buf_n++] = ch;
+			if (('\n' == ch) && (prev_ch == '\r')) {
+				gps_rx_len = buf_n;
+				OSA_SemaPost(&gps_task_sem);
+			}
 		}
 	}
 
