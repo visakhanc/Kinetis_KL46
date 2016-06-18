@@ -14,6 +14,10 @@
 #include "semphr.h"
 #include "event_groups.h"
 
+/* Define to 1 if GSM module need to be tested through command prompt */
+#define GSM_DEBUG 0
+
+
 #define HTTP_BUF_SIZE			256
 
 /* Event flag bits */
@@ -31,7 +35,7 @@
 typedef struct _gsm_status
 {
 	volatile bool registerd;
-	gprs_context;
+	volatile bool gprs_context;
 	int http_status;
 	int http_recv_len;
 	int http_read_count;
@@ -44,14 +48,10 @@ extern gsm_status_struct gsm_status;
 
 extern int gsm_init(void);
 extern int gsm_send_command(const char *cmd);
+extern int gsm_uart_acquire(void);
+extern int gsm_uart_release(void);
 extern int gsm_uart_send(const char *data, uint32_t len);
 extern uint32_t gsm_wait_for_event(uint32_t events, uint32_t delay_ticks);
 extern int gsm_send_sms(const char *buf, int length, const char *address);
-extern int http_get(const char *url);
-extern int http_open_context(void);
-extern int http_close_context(void);
-extern int http_init(void);
-extern int http_terminate(void);
-extern int http_find_string(const char* str, uint8_t *page_buf, int bufsize);
 
 #endif /* SOURCES_GSM_COMMON_H_ */

@@ -41,6 +41,7 @@ void BOARD_InitPins(void)
     /* Ungate the port clocks (XTAL pins are in PORTA) */
 	CLOCK_EnableClock(kCLOCK_PortA);
 	CLOCK_EnableClock(kCLOCK_PortB);
+	CLOCK_EnableClock(kCLOCK_PortD);
 	CLOCK_EnableClock(kCLOCK_PortC);
 	CLOCK_EnableClock(kCLOCK_PortE);
 
@@ -63,7 +64,7 @@ void BOARD_InitPins(void)
 	PORT_SetPinMux(PORTE, 17, kPORT_MuxAlt3);
 
 	/*LED pins*/
-	//PORT_SetPinMux(PORTD, 5, kPORT_MuxAsGpio);  	// GREEN
+	PORT_SetPinMux(PORTD, 5, kPORT_MuxAsGpio);  	// GREEN
 	PORT_SetPinMux(PORTE, 29, kPORT_MuxAsGpio);		// RED
 
 }

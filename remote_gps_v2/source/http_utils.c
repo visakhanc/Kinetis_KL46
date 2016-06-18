@@ -7,12 +7,16 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "http_utils.h"
 #include "gsm_common.h"
 #include "fsl_debug_console.h"
 
-#define URL_MAX_SIZE  170
-char url_buf[200];
+
 extern char http_buf[];
+
+#define URL_MAX_SIZE  170
+static char url_cmd_buf[200];
+static bool http_initialized = false;
 
 /* Description 	:	Use SIM900 HTTP GET feature to send GET request to given URL
  * Arguments 	: 	url - Null terminated URL string
@@ -46,16 +50,16 @@ int http_get(const char *url)
 	}
 
 	if(0 == ret) {
-		strcpy(url_buf, "AT+HTTPPARA=\"URL\",\"");
-		strcat(url_buf, url);
-		strcat(url_buf, "\"");
+		strcpy(url_cmd_buf, "AT+HTTPPARA=\"URL\",\"");
+		strcat(url_cmd_buf, url);
+		strcat(url_cmd_buf, "\"");
 		//http://maps.googleapis.com/maps/api/geocode/json?latlng=12.92736,77.60729"12.927281,77.607330
 
-		gsm_send_command(url_buf);
+		gsm_send_command(url_cmd_buf);
 		ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 4*1000);
 		if(ev & EVENT_GSM_ERROR) {
 			PRINTF("\n\rURL error");
-			PRINTF("\n\r%s", url_buf);
+			PRINTF("\n\r%s", url_cmd_buf);
 			ret = 1;
 		}
 		else if(!(ev & EVENT_GSM_OK)){
@@ -128,22 +132,32 @@ int http_open_context(void)
 	/* GPRS attach */
 	gsm_send_command("AT+CGATT=1");
 	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-	if(!(ev & (EVENT_GSM_OK|EVENT_GSM_ERROR))) {
+	if(ev & EVENT_GSM_ERROR) {
 		PRINTF("\n\rCGATT error");
 		return 1;
+	}
+	else if(!(ev & EVENT_GSM_OK)) {
+		PRINTF("\r\nCGATT timeout");
 	}
 
 	gsm_send_command("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\"");
 	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-	if(!(ev & (EVENT_GSM_OK|EVENT_GSM_ERROR))) {
+	if(ev & EVENT_GSM_ERROR) {
 		PRINTF("\n\rCONTYPE error");
 		return 1;
+	}
+	else if(!(ev & EVENT_GSM_OK)) {
+		PRINTF("\r\nCONTYPE timeout");
 	}
 
 	gsm_send_command("AT+SAPBR=3,1,\"APN\",\"www\"");
 	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-	if(!(ev & (EVENT_GSM_OK|EVENT_GSM_ERROR))) {
+	if(ev & EVENT_GSM_ERROR) {
 		PRINTF("\n\rAPN error");
+		return 1;
+	}
+	else if(!(ev & EVENT_GSM_OK)) {
+		PRINTF("\n\rAPN timeout");
 		return 1;
 	}
 
@@ -203,6 +217,10 @@ int http_init(void)
 	int ret = 0;
 	EventBits_t ev;
 
+	if(true == http_initialized) {
+		return 0;
+	}
+
 	gsm_send_command("AT+HTTPINIT");
 	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
 
@@ -215,6 +233,7 @@ int http_init(void)
 		ret = 1;
 	}
 
+	http_initialized = true;
 	return ret;
 }
 
@@ -223,15 +242,22 @@ int http_terminate(void)
 {
 	EventBits_t ev;
 
-	/* close HTTP */
-	gsm_send_command("AT+HTTPTERM");
-	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 1000);
-	if(ev & EVENT_GSM_ERROR)
-	{
-		PRINTF("\n\rhttp close error");
-		return 1;
+	if(false == http_initialized) {
+		return 0;
 	}
 
+	/* close HTTP */
+	gsm_send_command("AT+HTTPTERM");
+	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2000);
+	if(ev & EVENT_GSM_ERROR) {
+		PRINTF("\n\rhttpterm error");
+		return 1;
+	}
+	else if(!(ev & EVENT_GSM_OK)) {
+		PRINTF("\r\nhttpterm timeout");
+	}
+
+	http_initialized = false;
 	return 0;
 }
 

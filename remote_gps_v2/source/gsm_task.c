@@ -16,25 +16,15 @@
 #include "board.h"
 
 
-#define GSM_DEBUG 0
 
-/* Globals */
+
+/* Provate Functions */
+static void gsm_uart_rx_handler(UART_Type *base, uart_handle_t *handle, status_t status, void *userData);
+
+/***** Globals ******/
 extern gps_info_struct gps_info;
 gsm_status_struct gsm_status;
 char http_buf[HTTP_BUF_SIZE];
-char page_buf[256];
-float cur_lat, cur_lon;
-
-
-/* TODO: move to gsm_common, as needed */
-static int message_update_gpsdata(void);
-static int message_update_location(int offset);
-static int message_update_error(const char *err, int len);
-static void print_tx_data(void);
-static void gsm_uart_rx_handler(UART_Type *base, uart_handle_t *handle, status_t status, void *userData);
-
-static char maps_api_url[100] = "http://maps.googleapis.com/maps/api/geocode/json?latlng=12.92736,77.60729";
-#define URL_OFFSET  56
 
 
 /* FreeRTOS resources */
@@ -48,7 +38,6 @@ static volatile bool http_buf_switch = false;
 static volatile int http_buf_count;
 static uint8_t gsm_rx_isr_buf[2];
 static uint8_t gsm_rx_buf[100];
-static uint8_t gsm_tx_buf[200];
 static int gsm_rx_len;
 
 static const uart_config_t gsm_uart_config = {
@@ -68,10 +57,10 @@ static const uart_config_t gsm_uart_config = {
  *  and the received command is sent to GSM module. The response
  *  from GSM module is printed out to the console
  *
- *  Note: Set GSM_DEBUG macro to 1 for this purpose
+ *  Note: Set GSM_DEBUG macro to 1 for enabling this task
  */
 
-void control_task(void *pArg)
+void gsm_debug_task(void *pArg)
 {
 
 	uint32_t len, i;
@@ -99,8 +88,10 @@ void control_task(void *pArg)
 		}
 
 		len = i+1;
-		//UART_DRV_SendDataBlocking(GSM_UART, text, len, OSA_WAIT_FOREVER);
+
+		gsm_uart_acquire();
 		gsm_uart_send(text, len);
+		gsm_uart_release();
 	}
 
 }
@@ -169,11 +160,49 @@ int gsm_send_command(const char *cmd)
 
 
 /*
+ *  Get access to GSM UART by acquiring semaphore
+ *
+ *  NOTE: Tasks which communicate to GSM module will call this before
+ *  the section of code which deals with all communication with the module.
+ *  After this the Task releases the access by gsm_uart_release()
+ *
+ *  After this call the task would block indefinitely until acquiring the semaphore
+ *  Return:
+ *  	0 - Acquire successful
+ *  	1 - Something went wrong
+ */
+int gsm_uart_acquire(void)
+{
+	/* Take Mutex for GSM UART Tx */
+	if(pdTRUE != xSemaphoreTake(xGsmTxSem, portMAX_DELAY)) {
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
+ *  Releases the access to GSM UART acquired by calling gsm_uart_acquire()
+ *
+ *  Return:
+ *  	0 - Success
+ *  	1 - Error
+ */
+int gsm_uart_release(void)
+{
+	/* Release Tx Mutex */
+	if(pdTRUE != xSemaphoreGive(xGsmTxSem)) {
+		return 1;
+	}
+
+	return 0;
+}
+
+
+/*
  * Transmit data to GSM UART
- * 	1. Takes Tx semaphore
- * 	2. Calls UART driver API
- * 	3. Waits for TaskNotification from UART Handler
- * 	4. Release Semaphore
+ * 	1. Calls UART driver API
+ * 	2. Waits for TaskNotification from UART Handler
  *
  * 	Return: 0 - success; 1 - error
  */
@@ -183,21 +212,11 @@ int gsm_uart_send(const char *data, uint32_t len)
 	tx_xfer.data = (uint8_t *)data;
 	tx_xfer.dataSize = len;
 
-	/* Take Mutex for GSM UART Tx */
-	if(pdTRUE != xSemaphoreTake(xGsmTxSem, portMAX_DELAY)) {
-		return 1;
-	}
-
 	/* Initiate UART driver to send the data */
 	UART_TransferSendNonBlocking(GSM_UART_BASE, &gsm_uart_handle, &tx_xfer);
 
 	/* Block until UART handler signalling completion of Tx */
 	xSemaphoreTake(xGsmTxSyncSem, portMAX_DELAY);
-
-	/* Release Tx Mutex */
-	if(pdTRUE != xSemaphoreGive(xGsmTxSem)) {
-		return 1;
-	}
 
 	return 0;
 
@@ -273,124 +292,10 @@ int gsm_send_sms(const char *buf, int length, const char *address)
 		PRINTF("\r\nERROR: SMS timeout");
 		ret = 1;
 	}
+
 	return ret;
 }
 
-#if !GSM_DEBUG
-void control_task(void *pArg)
-{
-	uint32_t len;
-	EventBits_t ev;
-
-	if(gsm_init() != 0) {
-		PRINTF("gsm_init() error\r\n");
-	}
-
-	do {
-		gsm_send_command("AT");
-		ev = gsm_wait_for_event(EVENT_GSM_OK, 1000); // TODO: change to 100 ticks
-	} while (!(ev & EVENT_GSM_OK));
-
-	/* Disable AT echo */
-	gsm_send_command("ATE0");
-	ev = gsm_wait_for_event(EVENT_GSM_OK, 1000);
-
-	/* Registration complete? */
-	do {
-		gsm_send_command("AT+CREG?");
-		ev = gsm_wait_for_event(EVENT_GSM_OK, 1000);
-	} while (!(ev & EVENT_GSM_CREG));
-
-	PRINTF("\nRegistered\r\n");
-
-	/* Enable CLIP */
-	gsm_send_command("AT+CLIP=1");
-	ev = gsm_wait_for_event(EVENT_GSM_OK, 1000);
-
-	while (1) {
-		/* Waiting for the call */
-		ev = gsm_wait_for_event(EVENT_GSM_RING, 0);
-		if(ev & EVENT_GSM_RING) {
-
-			ev = gsm_wait_for_event(EVENT_GSM_CLIP, 1000);
-			if (ev & EVENT_GSM_CLIP) {
-				PRINTF("\nCall from %s\r\n", gsm_status.caller);
-
-				/* Disconnect call */
-				gsm_send_command("ATH");
-
-				if (0 != strcmp((char *)gsm_status.caller, "+919961601261")) {
-					continue;
-				}
-#if 0
-				// Convert to +/- according to N/S
-				cur_lat = gps_info.latitude;
-				cur_lon = gps_info.longitude;
-				len = float_to_string(&cur_lat, 6, (uint8_t *)&maps_api_url[URL_OFFSET]);
-				maps_api_url[URL_OFFSET + len] = ',';
-				len++;
-				float_to_string(&cur_lon, 6, (uint8_t *)&maps_api_url[URL_OFFSET + len]);
-#endif
-				/* Update message text with gps data */
-				len = message_update_gpsdata();
-
-				/* Lookup reverse geocoding url only if resonably accurate */
-				//if ((gps_info.fix > NO_FIX) && (gps_info.hdop < 2.0)) {
-				if (1) {
-					if (0 == http_open_context()) {
-						if (0 == http_init()) {
-							if (0 == http_get(maps_api_url)) {
-								PRINTF("\nget success: %d\r\n", gsm_status.http_recv_len);
-								if (0 == http_find_string("formatted_address", (uint8_t *)page_buf, sizeof(page_buf))) {
-									PRINTF("\nFound :)\n\r");
-									len = message_update_location(len);
-									PRINTF("%s", gsm_tx_buf);
-									/*
-									if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
-										PRINTF("\nSMS failed\r\n");
-									}
-									*/
-								}
-								else {
-									PRINTF("\nNot found :(\n\r");
-									PRINTF("\n%s\r\n", maps_api_url);
-								}
-							}
-							else {
-								PRINTF("\nLookup failed\n\r");
-								/* update error detail in message and send message */
-								len = message_update_error("Lookup failed\r\n", len);
-								/*
-								if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
-									PRINTF("\nSMS failed!\r\n");
-								}
-								*/
-							}
-
-							http_terminate();
-						}
-
-						http_close_context();
-
-					}
-				}
-				else {
-					PRINTF("\nSending message to %s...\n\r", gsm_status.caller);
-					/*
-					if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
-						PRINTF("\nSMS failed\r\n");
-					}
-					*/
-				}
-
-			}
-
-		}
-
-	}
-
-}
-#endif
 
 /*
  *  Task for handling various response strings received from GSM module
@@ -402,6 +307,10 @@ void gsm_rx_task(void *pArg)
 {
 	char rx_buf[100];
 	int len, temp;
+
+	if(gsm_init() != 0) {
+		PRINTF("gsm_init() error\r\n");
+	}
 
 	/* Use Task Notification to synchronize between UART Rx handler and GSM Rx task */
 	xGsmTaskHandle = xTaskGetCurrentTaskHandle();
@@ -493,6 +402,11 @@ void gsm_rx_task(void *pArg)
 }
 
 
+/*
+ * Wait for one or more GSM events, for a duration of 'delay_ticks'
+ *
+ * delay_ticks: number of ticks to wait (0: wait indefinitely)
+ */
 uint32_t gsm_wait_for_event(uint32_t events, uint32_t delay_ticks)
 {
 	TickType_t ticksToWait = (0 == delay_ticks)  ? portMAX_DELAY : delay_ticks;
@@ -568,62 +482,3 @@ static void gsm_uart_rx_handler(UART_Type *base, uart_handle_t *handle, status_t
 }
 
 
-
-
-int message_update_gpsdata(void)
-{
-	int offset = 0;
-	uint8_t str[16];
-
-	offset = sprintf((char *)&gsm_tx_buf[offset], "LatLon:");
-	float_to_string(&cur_lat, 6, str);
-	offset += sprintf((char *)&gsm_tx_buf[offset], "%s,", str);
-	float_to_string(&cur_lon, 6, str);
-	offset += sprintf((char *)&gsm_tx_buf[offset], "%s\r\n", str);
-	offset += sprintf((char *)&gsm_tx_buf[offset], "Dir:%d deg\r\n", gps_info.course);
-	offset += sprintf((char *)&gsm_tx_buf[offset], "Speed:%d kph\r\n", gps_info.velocity);
-	offset += sprintf((char *)&gsm_tx_buf[offset], "HDOP:%d\r\n", (int) (gps_info.hdop * 10.0));
-
-	return offset;
-}
-
-int message_update_location(int offset)
-{
-	int components = 0;
-	char *ptr = page_buf;
-
-	while (*ptr != ':')
-		ptr++;
-
-	ptr += 3;
-	while (components < 5) {
-		gsm_tx_buf[offset++] = *ptr++;
-		if (',' == *ptr) {
-			components++;
-		}
-
-		if ('\"' == *ptr) {
-			break;
-		}
-	}
-
-	gsm_tx_buf[offset] = '\0';
-
-	return offset;
-}
-
-
-int message_update_error(const char *err, int len)
-{
-	int offset = len;
-	offset += sprintf((char *)&gsm_tx_buf[len], "%s", err);
-	return offset;
-}
-
-
-void print_tx_data(void)
-{
-	PRINTF("\n\r");
-	PRINTF("%s", gsm_tx_buf);
-	PRINTF("\n\r");
-}

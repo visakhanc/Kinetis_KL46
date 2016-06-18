@@ -39,6 +39,7 @@
 #include "clock_config.h"
 #include "fsl_debug_console.h"
 #include "gps_parse.h"
+#include "gsm_common.h"
 
 /* FreeRTOS kernel includes. */
 #include "FreeRTOS.h"
@@ -47,29 +48,38 @@
 #include "timers.h"
 
 
-/* Task parameters */
-#define disp_task_PRIORITY 		(configMAX_PRIORITIES - 3)
-#define disp_task_STACKSIE		configMINIMAL_STACK_SIZE
 
-#define gps_task_PRIORITY		(configMAX_PRIORITIES - 2)
+/* Task functions and properties */
+extern void gps_task(void *pvParameters);
+#define GPS_TASK_PRIORITY		(configMAX_PRIORITIES - 2)
 #define GPS_TASK_STACKSIZE		512
 
-#define gsm_task_PRIORITY		(configMAX_PRIORITIES - 1)
+extern void gsm_rx_task(void *pvParameters);
+#define GSM_TASK_PRIORITY		(configMAX_PRIORITIES - 1)
 #define GSM_TASK_STACKSIZE		512
 
-#define control_task_PRIORITY	(configMAX_PRIORITIES - 2)
-#define CONTROL_TASK_STACKSIZE	512
+extern void message_task(void *pvParameters);
+#define MESSAGE_TASK_PRIORITY	(configMAX_PRIORITIES - 2)
+#define MESSAGE_TASK_STACKSIZE	512
 
-/* External functions */
-extern void gps_task(void *pvParameters);
-extern void control_task(void *pvParameters);
-extern void gsm_rx_task(void *pvParameters);
+extern void log_task(void *pvParameters);
+#define LOG_TASK_PRIORITY		(configMAX_PRIORITIES - 2)
+#define LOG_TASK_STACKSIZE		512
+
+#if GSM_DEBUG == 1
+extern void gsm_debug_task(void *pvParameters);
+#define GSM_DEBUG_TASK_PRIORITY	(configMAX_PRIORITIES - 2)
+#define GSM_DEBUG_TASK_STACKSIZE	512
+#endif
+
 
 /* Globals */
 extern gps_info_struct gps_info;
 
 
 static void disp_task(void *pArg);
+#define disp_task_PRIORITY 		(configMAX_PRIORITIES - 3)
+#define disp_task_STACKSIE		configMINIMAL_STACK_SIZE
 
 
 
@@ -82,15 +92,21 @@ int main(void) {
   BOARD_BootClockRUN();
   BOARD_InitDebugConsole();
 
-  // Initialize LEDs to OFF state
-  LED_RED_INIT(1);
-  LED_GREEN_INIT(1);
+  /* Initialize LEDs to OFF state */
+  LED_RED_INIT(LOGIC_LED_OFF);
+  LED_GREEN_INIT(LOGIC_LED_OFF);
 
   /* Create RTOS tasks */
   //xTaskCreate(disp_task, "DispTask", disp_task_STACKSIE, NULL, disp_task_PRIORITY, NULL);
-  xTaskCreate(gps_task, "GpsTask", GPS_TASK_STACKSIZE, NULL, gps_task_PRIORITY, NULL);
-  xTaskCreate(control_task, "ControlTask", CONTROL_TASK_STACKSIZE, NULL, control_task_PRIORITY, NULL);
-  xTaskCreate(gsm_rx_task, "GSMTask", GSM_TASK_STACKSIZE, NULL, gsm_task_PRIORITY, NULL);
+  xTaskCreate(gps_task, "GpsTask", GPS_TASK_STACKSIZE, NULL, GPS_TASK_PRIORITY, NULL);
+  xTaskCreate(gsm_rx_task, "GSMTask", GSM_TASK_STACKSIZE, NULL, GSM_TASK_PRIORITY, NULL);
+#if (GSM_DEBUG == 0)
+  xTaskCreate(log_task, "LogTask", LOG_TASK_STACKSIZE, NULL, LOG_TASK_PRIORITY, NULL);
+  xTaskCreate(message_task, "MessageTask", MESSAGE_TASK_STACKSIZE, NULL, MESSAGE_TASK_PRIORITY, NULL);
+#else
+  xTaskCreate(gsm_debug_task, "GsmDebug", GSM_DEBUG_TASK_STACKSIZE, NULL, GSM_DEBUG_TASK_PRIORITY, NULL);
+#endif
+
   vTaskStartScheduler();
 
 
