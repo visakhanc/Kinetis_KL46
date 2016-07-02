@@ -31,6 +31,17 @@
 #include "fsl_common.h"
 #include "fsl_port.h"
 
+/* configuration for push button switch (for SW1 and SW3) */
+port_pin_config_t switch_pin_config = {
+	kPORT_PullUp,
+	kPORT_SlowSlewRate,
+	kPORT_PassiveFilterEnable,
+	kPORT_LowDriveStrength,
+	kPORT_MuxAsGpio
+};
+
+static void configure_lcd_pins(uint32_t instance);
+
 /*******************************************************************************
  * Code
  ******************************************************************************/
@@ -67,4 +78,38 @@ void BOARD_InitPins(void)
 	PORT_SetPinMux(PORTD, 5, kPORT_MuxAsGpio);  	// GREEN
 	PORT_SetPinMux(PORTE, 29, kPORT_MuxAsGpio);		// RED
 
+	/* SW1 Pin */
+	PORT_SetPinMux(PORTC, 3, kPORT_MuxAsGpio);
+	PORT_SetPinConfig(PORTC, 3, &switch_pin_config);
+	PORT_SetPinInterruptConfig(PORTC, 3, kPORT_InterruptRisingEdge);
+	PORT_ClearPinsInterruptFlags(PORTC, (1 << 3));
+
+	/* SW3 Pin */
+	PORT_SetPinMux(PORTC, 12, kPORT_MuxAsGpio);
+	PORT_SetPinConfig(PORTC, 12, &switch_pin_config);
+	PORT_SetPinInterruptConfig(PORTC, 12, kPORT_InterruptRisingEdge);
+	PORT_ClearPinsInterruptFlags(PORTC, (1 << 12));
+
+	/* SLCD pins */
+	configure_lcd_pins(0);
+}
+
+
+static void configure_lcd_pins(uint32_t instance)
+{
+    PORT_SetPinMux(PORTE, 4u, kPORT_MuxAlt7);
+    PORT_SetPinMux(PORTE, 5u, kPORT_MuxAlt7);
+
+    PORT_SetPinMux(PORTB, 7u, kPORT_MuxAlt7);
+    PORT_SetPinMux(PORTB, 8u, kPORT_MuxAlt7);
+    PORT_SetPinMux(PORTB, 10u, kPORT_MuxAlt7);
+    PORT_SetPinMux(PORTB, 11u, kPORT_MuxAlt7);
+    PORT_SetPinMux(PORTB, 21u, kPORT_MuxAlt7);
+    PORT_SetPinMux(PORTB, 22u, kPORT_MuxAlt7);
+    PORT_SetPinMux(PORTB, 23u, kPORT_MuxAlt7);
+
+    PORT_SetPinMux(PORTC, 17u, kPORT_MuxAlt7);
+    PORT_SetPinMux(PORTC, 18u, kPORT_MuxAlt7);
+
+    PORT_SetPinMux(PORTD, 0u, kPORT_MuxAlt7);
 }
