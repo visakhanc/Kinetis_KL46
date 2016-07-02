@@ -14,6 +14,8 @@
 #include "gps_parse.h"
 #include "fsl_debug_console.h"
 
+#define EVENT_SEND_MESSAGE  (1 << 30)
+
 static int message_update_gpsdata(void);
 static int message_update_location(int offset);
 static int message_update_error(const char *err, int len);
@@ -65,91 +67,85 @@ void message_task(void *pArg)
 	gsm_send_command("AT+CLIP=1");
 	ev = gsm_wait_for_event(EVENT_GSM_OK, 1000);
 
+	/* some delay before gprs configuration */
+	vTaskDelay(2000);
+
+	if(gprs_configure() != 0) {
+		PRINTF("\r\nError: gprs_configure");
+	}
+
 	/* Release GSM UART */
 	gsm_uart_release();
 
 	while (1) {
 		/* Waiting for the call */
-		ev = gsm_wait_for_event(EVENT_GSM_RING, 0);
-		if(ev & EVENT_GSM_RING) {
+		ev = gsm_wait_for_event((1 << 10), 0); // TODO: Define a Task notification for this
+		if(ev & (1 << 10)) {
 
-			ev = gsm_wait_for_event(EVENT_GSM_CLIP, 1000);
-			if (ev & EVENT_GSM_CLIP) {
-				PRINTF("\nCall from %s\r\n", gsm_status.caller);
+			PRINTF("\r\nGoing to send message");
 
-				/* Get access to GSM UART */
-				if(gsm_uart_acquire() != 0) {
-					PRINTF("\r\ncontrol_task: gsm_uart_acquire() failed");
-					/* Wait again for call */
-					continue;
-				}
+			/* Get access to GSM UART */
+			if(gsm_uart_acquire() != 0) {
+				PRINTF("\r\nmessage: gsm_uart_acquire() failed");
+				/* Wait again for call */
+				continue;
+			}
 
-				/* Disconnect call */
-				gsm_send_command("ATH");
+			// Convert to +/- according to N/S
+			cur_lat = gps_info.latitude;
+			cur_lon = gps_info.longitude;
+			len = float_to_string(&cur_lat, 6, (uint8_t *)&maps_api_url[URL_OFFSET]);
+			maps_api_url[URL_OFFSET + len] = ',';
+			len++;
+			float_to_string(&cur_lon, 6, (uint8_t *)&maps_api_url[URL_OFFSET + len]);
 
-				/*  Ignore if number is not registered */
-				if (0 != strcmp((char *)gsm_status.caller, "+919961601261")) {
-					gsm_uart_release();
-					continue;
-				}
+			/* Update message text with gps data */
+			len = message_update_gpsdata();
 
-				// Convert to +/- according to N/S
-				cur_lat = gps_info.latitude;
-				cur_lon = gps_info.longitude;
-				len = float_to_string(&cur_lat, 6, (uint8_t *)&maps_api_url[URL_OFFSET]);
-				maps_api_url[URL_OFFSET + len] = ',';
-				len++;
-				float_to_string(&cur_lon, 6, (uint8_t *)&maps_api_url[URL_OFFSET + len]);
-
-				/* Update message text with gps data */
-				len = message_update_gpsdata();
-
-				/* Lookup reverse geocoding url only if resonably accurate */
-				if ((gps_info.fix > NO_FIX) && (gps_info.hdop < 2.0)) {
-					if (0 == http_open_context()) {
-						if (0 == http_init()) {
-							if (0 == http_get(maps_api_url)) {
-								PRINTF("\nget success: %d\r\n", gsm_status.http_recv_len);
-								if (0 == http_find_string("formatted_address", (uint8_t *)page_buf, sizeof(page_buf))) {
-									PRINTF("\nFound :)\n\r");
-									len = message_update_location(len);
-									PRINTF("%s", gsm_tx_buf);
-									if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
-										PRINTF("\nSMS failed\r\n");
-									}
-								}
-								else {
-									PRINTF("\nNot found :(\n\r");
-									PRINTF("\n%s\r\n", maps_api_url);
+			/* Lookup reverse geocoding url only if resonably accurate */
+			if ((gps_info.fix > NO_FIX) && (gps_info.hdop < 2.0)) {
+				if (0 == http_open_context()) {
+					if (0 == http_init()) {
+						if (0 == http_get(maps_api_url)) {
+							PRINTF("\nget success: %d\r\n", gsm_status.http_recv_len);
+							if (0 == http_find_string("formatted_address", (uint8_t *)page_buf, sizeof(page_buf))) {
+								PRINTF("\nFound :)\n\r");
+								len = message_update_location(len);
+								PRINTF("%s", gsm_tx_buf);
+								if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
+									PRINTF("\nSMS failed\r\n");
 								}
 							}
 							else {
-								PRINTF("\nLookup failed\n\r");
-								/* update error detail in message and send message */
-								len = message_update_error("Lookup failed\r\n", len);
-								if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
-									PRINTF("\nSMS failed!\r\n");
-								}
+								PRINTF("\nNot found :(\n\r");
+								PRINTF("\n%s\r\n", maps_api_url);
 							}
-
-							http_terminate();
+						}
+						else {
+							PRINTF("\nLookup failed\n\r");
+							/* update error detail in message and send message */
+							len = message_update_error("Lookup failed\r\n", len);
+							if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
+								PRINTF("\nSMS failed!\r\n");
+							}
 						}
 
-						http_close_context();
-
+						http_terminate();
 					}
-				}
-				else {
-					PRINTF("\nSending message to %s...\n\r", gsm_status.caller);
-					if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
-						PRINTF("\nSMS failed\r\n");
-					}
-				}
 
-				/* Release GSM UART */
-				gsm_uart_release();
+					http_close_context();
 
+				}
 			}
+			else {
+				PRINTF("\nSending message to %s...\n\r", gsm_status.caller);
+				if (0 != gsm_send_sms((char *)gsm_tx_buf, len, (char *)gsm_status.caller)) {
+					PRINTF("\nSMS failed\r\n");
+				}
+			}
+
+			/* Release GSM UART */
+			gsm_uart_release();
 
 		}
 
