@@ -40,6 +40,7 @@
 #include "fsl_debug_console.h"
 #include "gps_parse.h"
 #include "gsm_common.h"
+#include "seg_lcd.h"
 
 /* FreeRTOS kernel includes. */
 #include "FreeRTOS.h"
@@ -59,12 +60,16 @@ extern void gsm_rx_task(void *pvParameters);
 #define GSM_TASK_STACKSIZE		512
 
 extern void message_task(void *pvParameters);
-#define MESSAGE_TASK_PRIORITY	(configMAX_PRIORITIES - 2)
+#define MESSAGE_TASK_PRIORITY	(configMAX_PRIORITIES - 3)
 #define MESSAGE_TASK_STACKSIZE	512
 
 extern void log_task(void *pvParameters);
-#define LOG_TASK_PRIORITY		(configMAX_PRIORITIES - 2)
+#define LOG_TASK_PRIORITY		(configMAX_PRIORITIES - 3)
 #define LOG_TASK_STACKSIZE		512
+
+extern void monitor_task(void *pvParameters);
+#define MONITOR_TASK_PRIORITY	(configMAX_PRIORITIES - 2)
+#define MONITOR_TASK_STACKSIZE	256
 
 #if GSM_DEBUG == 1
 extern void gsm_debug_task(void *pvParameters);
@@ -78,9 +83,8 @@ extern gps_info_struct gps_info;
 
 
 static void disp_task(void *pArg);
-#define disp_task_PRIORITY 		(configMAX_PRIORITIES - 3)
-#define disp_task_STACKSIE		configMINIMAL_STACK_SIZE
-
+#define DISP_TASK_PRIORITY 		(configMAX_PRIORITIES - 4)
+#define DISP_TASK_STACKSIE		configMINIMAL_STACK_SIZE
 
 
 /*!
@@ -96,6 +100,9 @@ int main(void) {
   LED_RED_INIT(LOGIC_LED_OFF);
   LED_GREEN_INIT(LOGIC_LED_OFF);
 
+  /* Enable interrupt for push buttons */
+  //NVIC_EnableIRQ(PORTC_PORTD_IRQn);
+
   /* Create RTOS tasks */
   //xTaskCreate(disp_task, "DispTask", disp_task_STACKSIE, NULL, disp_task_PRIORITY, NULL);
   xTaskCreate(gps_task, "GpsTask", GPS_TASK_STACKSIZE, NULL, GPS_TASK_PRIORITY, NULL);
@@ -103,10 +110,11 @@ int main(void) {
 #if (GSM_DEBUG == 0)
   xTaskCreate(log_task, "LogTask", LOG_TASK_STACKSIZE, NULL, LOG_TASK_PRIORITY, NULL);
   xTaskCreate(message_task, "MessageTask", MESSAGE_TASK_STACKSIZE, NULL, MESSAGE_TASK_PRIORITY, NULL);
+  xTaskCreate(monitor_task, "Monitor", MONITOR_TASK_STACKSIZE, NULL, MONITOR_TASK_PRIORITY, NULL);
 #else
   xTaskCreate(gsm_debug_task, "GsmDebug", GSM_DEBUG_TASK_STACKSIZE, NULL, GSM_DEBUG_TASK_PRIORITY, NULL);
 #endif
-
+  xTaskCreate(disp_task, "disp", DISP_TASK_STACKSIE, NULL, DISP_TASK_PRIORITY, NULL);
   vTaskStartScheduler();
 
 
@@ -121,9 +129,13 @@ int main(void) {
  */
 static void disp_task(void *pArg)
 {
+	bool sec = false;
+	gps_time_struct ist_time;
 
+	slcd_init();
 	while(1)
 	{
+#if 0
 		PRINTF("\n\r");
 		PRINTF("Time: %02d:%02d:%02d  %d/%d/%d",
 				gps_info.time.hour, gps_info.time.min, gps_info.time.sec,
@@ -144,6 +156,17 @@ static void disp_task(void *pArg)
 		PRINTF("\n\rCourse:   %d deg", (int)gps_info.course);
 		PRINTF("\n\rHDOP:     %d.%d", (int)gps_info.hdop, (int)((gps_info.hdop * 10.0) - (int)gps_info.hdop * 10));
 		PRINTF("\n\rSatellites used: %d\n", gps_info.sat_used);
+#endif
+
+		gps_time_to_ist(&gps_info.time, &ist_time);
+		slcd_display_time(ist_time.hour, ist_time.min);
+		sec = !sec;
+		if(true == sec) {
+			slcd_set_colon();
+		}
+		else {
+			slcd_clear_colon();
+		}
 
 		vTaskDelay(1000);
 	}

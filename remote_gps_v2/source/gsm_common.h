@@ -32,6 +32,7 @@
 #define EVENT_GSM_CMGS			(1 << 8)
 #define EVENT_GSM_CMGR			(1 << 9)
 
+
 typedef struct _gsm_status
 {
 	volatile bool registerd;
