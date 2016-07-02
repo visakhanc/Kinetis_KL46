@@ -129,37 +129,6 @@ int http_open_context(void)
 {
 	EventBits_t ev;
 
-	/* GPRS attach */
-	gsm_send_command("AT+CGATT=1");
-	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-	if(ev & EVENT_GSM_ERROR) {
-		PRINTF("\n\rCGATT error");
-		return 1;
-	}
-	else if(!(ev & EVENT_GSM_OK)) {
-		PRINTF("\r\nCGATT timeout");
-	}
-
-	gsm_send_command("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\"");
-	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-	if(ev & EVENT_GSM_ERROR) {
-		PRINTF("\n\rCONTYPE error");
-		return 1;
-	}
-	else if(!(ev & EVENT_GSM_OK)) {
-		PRINTF("\r\nCONTYPE timeout");
-	}
-
-	gsm_send_command("AT+SAPBR=3,1,\"APN\",\"www\"");
-	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-	if(ev & EVENT_GSM_ERROR) {
-		PRINTF("\n\rAPN error");
-		return 1;
-	}
-	else if(!(ev & EVENT_GSM_OK)) {
-		PRINTF("\n\rAPN timeout");
-		return 1;
-	}
 
 	/* query gprs context */
 	gsm_send_command("AT+SAPBR=2,1");
@@ -192,6 +161,7 @@ int http_open_context(void)
 
 	PRINTF("\n\rgprs opened");
 
+
 	return 0;
 }
 
@@ -200,14 +170,29 @@ int http_close_context(void)
 {
 	EventBits_t ev;
 
-	/* close gprs context */
-	gsm_send_command("AT+SAPBR=0,1");
+	gsm_send_command("AT+SAPBR=2,1");
 	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-	if(ev & EVENT_GSM_ERROR)
-	{
-		PRINTF("\n\rgprs close error");
+	if(ev & EVENT_GSM_OK) {
+		if(true == gsm_status.gprs_context) {
+			/* close gprs context */
+			gsm_send_command("AT+SAPBR=0,1");
+			ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 5*1000);
+			if(ev & EVENT_GSM_ERROR)
+			{
+				PRINTF("\n\rgprs close error");
+				return 1;
+			}
+			else if(!(ev & EVENT_GSM_OK)) {
+				PRINTF("\r\ngprs close timeout");
+				return 1;
+			}
+		}
+	}
+	else {
+		PRINTF("\r\ngprs query error");
 		return 1;
 	}
+
 	return 0;
 }
 
@@ -346,4 +331,45 @@ int http_find_string(const char* str, uint8_t *page_buf, int bufsize)
 	return -1;
 }
 
+/*
+ * Configure GPRS for first time
+ */
+int gprs_configure(void)
+{
+	EventBits_t ev;
 
+	/* GPRS attach */
+	gsm_send_command("AT+CGATT=1");
+	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
+	if(ev & EVENT_GSM_ERROR) {
+		PRINTF("\n\rCGATT error");
+		return 1;
+	}
+	else if(!(ev & EVENT_GSM_OK)) {
+		PRINTF("\r\nCGATT timeout");
+	}
+
+	gsm_send_command("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\"");
+	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
+	if(ev & EVENT_GSM_ERROR) {
+		PRINTF("\n\rCONTYPE error");
+		return 1;
+	}
+	else if(!(ev & EVENT_GSM_OK)) {
+		PRINTF("\r\nCONTYPE timeout");
+	}
+
+	gsm_send_command("AT+SAPBR=3,1,\"APN\",\"www\"");
+	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
+	if(ev & EVENT_GSM_ERROR) {
+		PRINTF("\n\rAPN error");
+		return 1;
+	}
+	else if(!(ev & EVENT_GSM_OK)) {
+		PRINTF("\n\rAPN timeout");
+		return 1;
+	}
+
+	return 0;
+
+}
