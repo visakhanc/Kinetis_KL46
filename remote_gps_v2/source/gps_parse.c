@@ -182,3 +182,41 @@ int gps_parse_rmc(const char *buf, gps_info_struct_ptr gps_info_ptr)
 
 	return 0;
 }
+
+
+void gps_time_to_ist(gps_time_struct *gps_time, gps_time_struct *ist_time)
+{
+	uint32_t carry = 0;
+
+	ist_time->sec = gps_time->sec;
+	ist_time->min = gps_time->min + 30;
+	if(ist_time->min > 59) {
+		ist_time->min = 0;
+		carry = 1;
+	}
+
+	ist_time->hour = gps_time->hour + 5 + carry;
+	carry = 0;
+	if(ist_time->hour > 23) {
+		ist_time->hour = 0;
+		carry = 1;
+	}
+	ist_time->date = gps_time->date + carry;
+	carry = 0;
+	if(	(((gps_time->month < 8) && (gps_time->month & 0x1)) ||
+		 ((gps_time->month >= 8) && (!(gps_time->month & 0x1))) ) && (ist_time->date > 31)) {
+		ist_time->date = 1;
+		carry = 1;
+	}
+	else if ((gps_time->month == 2) && (ist_time->date > 28)) {
+		ist_time->date = 1;
+		carry = 1;
+	}
+	ist_time->month = gps_time->month + carry;
+	carry = 0;
+	if(ist_time->month > 12) {
+		ist_time->month = 1;
+		carry = 1;
+	}
+	ist_time->year = gps_time->year + carry;
+}

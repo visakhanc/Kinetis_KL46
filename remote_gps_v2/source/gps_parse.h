@@ -65,6 +65,6 @@ typedef struct _gps_info
 
 extern int gps_parse_gga(const char *buf, gps_info_struct_ptr gps_info_ptr);
 extern int gps_parse_rmc(const char *buf, gps_info_struct_ptr gps_info_ptr);
-
+extern void gps_time_to_ist(gps_time_struct *gps_time, gps_time_struct *ist_time);
 
 #endif /* SOURCES_GPS_PARSE_H_ */
