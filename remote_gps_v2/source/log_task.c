@@ -31,7 +31,7 @@ static char log_api_url[150] = "positioning.hol.es/save_loc.php?";
 #define LOG_URL_OFFSET 32
 
 static TaskHandle_t xLogTaskHandle;
-
+volatile static bool logEnabled = false;
 
 void log_task(void *pvParameters)
 {
@@ -40,7 +40,7 @@ void log_task(void *pvParameters)
 	int offset;
 	volatile int count = 0;
 	uint32_t notifValue = 0;
-	volatile bool enabled = false;
+	uint8_t log_reply_buf[20];
 
 	xLogTaskHandle = xTaskGetCurrentTaskHandle();
 	do {
@@ -54,12 +54,14 @@ void log_task(void *pvParameters)
 		/* Wait for Notification to start/stop logging */
 		if(pdTRUE == xTaskNotifyWait(0, -1UL, &notifValue, 6000)) {
 			if(notifValue & EVENT_START_LOGGING) {
-				enabled = true;
 				PRINTF("\r\nLogging started");
+				if(gprs_configure() != 0) {
+					PRINTF("\r\nError: gprs_configure");
+				}
 			}
 			if(notifValue & EVENT_STOP_LOGGING) {
-				enabled = false;
 				if(0 != gsm_uart_acquire()) { PRINTF("\r\nlog: uart acquire fail"); }
+				// TODO: disable logging on server too?
 				http_terminate();
 				http_close_context();
 				if(0 != gsm_uart_release()) { PRINTF("\r\nlog: uart release fail"); }
@@ -67,7 +69,7 @@ void log_task(void *pvParameters)
 			}
 		}
 
-		if((!count) || (true == enabled)) {
+		if((!count) || (true == logEnabled)) {
 
 			/* Log only if position is reasonably accurate */
 			if((gps_info.fix > NO_FIX) && (gps_info.hdop < 2.0)) {
@@ -96,15 +98,31 @@ void log_task(void *pvParameters)
 						if(0 == http_get(log_api_url)) {
 							PRINTF("\r\nlog: GET success (response: %d B )", gsm_status.http_recv_len);
 							LED_RED_ON();
+							/* Read HTTP response */
+							if(gsm_status.http_recv_len < sizeof(log_reply_buf)) {
+								if(0 == http_read(log_reply_buf, 0, gsm_status.http_recv_len)) {
+									log_reply_buf[gsm_status.http_recv_len] = '\0';
+									/* Check whether to continue logging */
+									if(strstr((char *)log_reply_buf, "Cont") != NULL) {
+										logEnabled = true;
+									}
+									else {
+										logEnabled = false;
+										http_terminate();
+										http_close_context();
+									}
+								}
+							}
 							vTaskDelay(100);
 							LED_RED_OFF();
 
-							http_terminate();
+							//http_terminate();
 							count++;
+							PRINTF("Total: %d\r\n", count);
 						}
 						else {
 							PRINTF("\r\nlog: GET failed");
-							http_terminate(); // try closing the stack
+							//http_terminate(); // try closing the stack
 						}
 					}
 					else {
@@ -132,7 +150,6 @@ void log_task(void *pvParameters)
 void log_task_switch(void)
 {
 	uint32_t	notifValue;
-	static bool logEnabled = false;
 
 	if(true == logEnabled) {
 		logEnabled = false;
