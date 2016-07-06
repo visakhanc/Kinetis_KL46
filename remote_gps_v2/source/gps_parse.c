@@ -191,7 +191,7 @@ void gps_time_to_ist(gps_time_struct *gps_time, gps_time_struct *ist_time)
 	ist_time->sec = gps_time->sec;
 	ist_time->min = gps_time->min + 30;
 	if(ist_time->min > 59) {
-		ist_time->min = 0;
+		ist_time->min -= 60;
 		carry = 1;
 	}
 
