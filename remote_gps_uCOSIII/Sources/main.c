@@ -41,6 +41,7 @@
 #include "seg_lcd.h"
 #include "fsl_port_hal.h"
 
+
 #define LED_TASK_STACKSIZE  256
 #define LED_TASK_PRIO		5  /* uC-OSIII priority=4+2=6 */
 

@@ -11,10 +11,16 @@
 #include "fsl_debug_console.h"
 
 #define URL_MAX_SIZE  170
-char url_buf[200];
+char url_cmd_buf[200];
 extern char http_buf[];
 
-
+/* Description 	:	Use SIM900 HTTP GET feature to send GET request to given URL
+ * Arguments 	: 	url - Null terminated URL string
+ * Returns 		: 	0 - HTTP GET status code 200 (OK) received
+ * 					-1 - Any error
+ * Note			:	Received response is not read from SIM900 module.
+ * 					This has to be done seperately, using other functions
+ */
 int http_get(const char *url)
 {
 	int ret = 0;
@@ -43,17 +49,17 @@ int http_get(const char *url)
 	}
 
 	if(0 == ret) {
-		strcpy(url_buf, "AT+HTTPPARA=\"URL\",\"");
-		strcat(url_buf, url);
-		strcat(url_buf, "\"");
+		strcpy(url_cmd_buf, "AT+HTTPPARA=\"URL\",\"");
+		strcat(url_cmd_buf, url);
+		strcat(url_cmd_buf, "\"");
 		//http://maps.googleapis.com/maps/api/geocode/json?latlng=12.92736,77.60729"12.927281,77.607330
 
-		gsm_send_command(url_buf);
+		gsm_send_command(url_cmd_buf);
 		result = OSA_EventWait(&gsm_event, EVENT_GSM_OK|EVENT_GSM_ERROR, false, 4*1000, &res_event);
 		if(kStatus_OSA_Success == result) {
 			if(res_event & EVENT_GSM_ERROR) {
 				debug_printf("\n\rURL error");
-				debug_printf("\n\r%s", url_buf);
+				debug_printf("\n\r%s", url_cmd_buf);
 				ret = -1;
 			}
 		}
@@ -84,15 +90,15 @@ int http_get(const char *url)
 		if(kStatus_OSA_Success == result) {
 			if(200 == gsm_status.http_status)
 			{
-				debug_printf("\n\rGet ok: %d", gsm_status.http_recv_len);
+				debug_printf("\n\rGET ok: revd %d bytes", gsm_status.http_recv_len);
 			}
 			else {
-				debug_printf("\n\rGet error: %d", gsm_status.http_status);
+				debug_printf("\n\rGET error: %d", gsm_status.http_status);
 				ret = -1;
 			}
 		}
 		else {
-			debug_printf("\n\rGet timeout");
+			debug_printf("\n\rGET timeout");
 			ret = -1;
 		}
 	}
@@ -251,7 +257,8 @@ int http_terminate(void)
 }
 
 
-/* Read 'size' bytes from the currently received http page in SIM900 at 'offset' bytes into the given buffer */
+/* Read 'size' bytes from the currently received http page at 'offset' bytes
+ * from SIM900 internal buffer, into the given buffer */
 int http_read(uint8_t *buf, int offset, int size)
 {
 	uint32_t result;
@@ -280,6 +287,10 @@ int http_read(uint8_t *buf, int offset, int size)
 }
 
 
+/* Look for the given string in the received HTTP page in SIM900 internal buffer
+ * If found, 'page_buf is filled with content from the received page, starting with
+ * given string upto either end of the page or the size of 'page_buf' ('bufsize')
+ */
 int http_find_string(const char* str, char *page_buf, int bufsize)
 {
 	int total_size = gsm_status.http_recv_len;

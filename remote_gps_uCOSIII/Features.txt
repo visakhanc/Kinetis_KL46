@@ -9,4 +9,6 @@ To be included :
 .....
 
 Last-1. App based monitoring
+	Password to access log from server
+	Access log and display as route
 Last. Remote upgrade

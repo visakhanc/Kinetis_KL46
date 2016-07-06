@@ -159,7 +159,7 @@ void configure_gpio_i2c_pins(uint32_t instance)
 
 
 /* Setup TSI pins for on board electrodes */
-void configure_tsi_pins(uint32_t instance) // todo
+void configure_tsi_pins(uint32_t instance)
 {
   switch(instance) {
     case 0:                             /* TSI0 */
