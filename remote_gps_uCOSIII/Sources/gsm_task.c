@@ -15,7 +15,7 @@
 #include "num_utils.h"
 #include "board.h"
 
-#define GSM_DEBUG 1
+#define GSM_DEBUG 0
 
 extern void UART2_IRQHandler(void);
 extern int message_update_gpsdata(void);
@@ -288,9 +288,7 @@ void control_task(void *pArg)
 
 	while (1) {
 		/* Waiting for the call */
-		if (kStatus_OSA_Success == OSA_EventWait(&gsm_event, EVENT_GSM_RING,
-		false,
-		OSA_WAIT_FOREVER, &res_event)) {
+		if (kStatus_OSA_Success == OSA_EventWait(&gsm_event, EVENT_GSM_RING, false, OSA_WAIT_FOREVER, &res_event)) {
 			if (kStatus_OSA_Success == OSA_EventWait(&gsm_event, EVENT_GSM_CLIP, false, 1000, &res_event)) {
 				debug_printf("\nCall from %s\r\n", gsm_status.caller);
 
@@ -361,6 +359,8 @@ void control_task(void *pArg)
 	}
 
 }
+
+
 
 void gsm_rx_task(void *pArg)
 {
@@ -450,6 +450,7 @@ void gsm_rx_task(void *pArg)
 
 }
 
+
 /*
  * 	UART Rx handler for GSM UART
  *
@@ -467,21 +468,21 @@ static void gsm_uart_rx_handler(uint32_t instance, void *state)
 
 	ch = *(u_state->rxBuff);
 
-	if ((false == http_buf_switch) && (buf_n < sizeof(gsm_rx_buf))) {
+	if (false == http_buf_switch) {
+		if(buf_n < sizeof(gsm_rx_buf)) {
+			gsm_rx_buf[buf_n++] = ch;
+			if (('\n' == ch) && ('\r' == prev_ch)) {
+				gsm_rx_len = buf_n - 2;
+				gsm_rx_buf[gsm_rx_len] = '\0';
+				buf_n = 0;
 
-		gsm_rx_buf[buf_n++] = ch;
-		if (('\n' == ch) && ('\r' == prev_ch)) {
-			gsm_rx_len = buf_n - 2;
-			gsm_rx_buf[gsm_rx_len] = '\0';
-			buf_n = 0;
-
-			/* If only more than CR-LF */
-			if (gsm_rx_len > 0) {
-				OSA_SemaPost(&gsm_rx_sem);
+				/* If only more than CR-LF */
+				if (gsm_rx_len > 0) {
+					OSA_SemaPost(&gsm_rx_sem);
+				}
 			}
+			prev_ch = ch;
 		}
-
-		prev_ch = ch;
 	}
 	else {
 		if (http_n < sizeof(http_buf)) {
@@ -539,12 +540,15 @@ int message_update_location(int offset)
 	return offset;
 }
 
+
 int message_update_error(const char *err, int len)
 {
 	int offset = len;
 	offset += sprintf(&gsm_tx_buf[len], "%s", err);
 	return offset;
 }
+
+
 void print_tx_data(void)
 {
 	debug_printf("\n\r");
