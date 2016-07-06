@@ -8,7 +8,7 @@
  *      Author: Visakhan
  */
 
-
+#include "common.h"
 #include "gsm_common.h"
 #include "http_utils.h"
 #include "gps_parse.h"
@@ -23,12 +23,9 @@
 /* Globals */
 extern gps_info_struct gps_info;
 
-//static char log_api_url[150] = "embeddedworld.co.nf/save_loc.php?";
-/* position in the URL to place parameters */
-//#define LOG_URL_OFFSET 33
 
-static char log_api_url[150] = "positioning.hol.es/save_loc.php?";
-#define LOG_URL_OFFSET 32
+static char log_api_url[150] = LOG_API_URL;
+#define LOG_URL_OFFSET (sizeof(LOG_API_URL)-1)
 
 static TaskHandle_t xLogTaskHandle;
 volatile static bool logEnabled = false;

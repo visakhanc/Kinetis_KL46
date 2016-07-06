@@ -7,7 +7,7 @@
  *      Author: Visakhan
  */
 
-
+#include "common.h"
 #include "gsm_common.h"
 #include "fsl_debug_console.h"
 
@@ -33,7 +33,7 @@ void monitor_task(void *pvParameters)
 					gsm_wait_for_event(EVENT_GSM_OK, 500);
 					
 					/* Process only if number is registered */
-					if (0 == strcmp((char *)gsm_status.caller, "+919048383167")) {
+					if (0 == strcmp((char *)gsm_status.caller, AUTH_CALLER)) {
 						/* Start/Stop logging */
 						log_task_switch();
 					}

@@ -5,6 +5,8 @@
  *      Author: Visakhan
  */
 
+#include "config_private.h"
+
 #define GPS_UART_BASE 		UART1
 #define GPS_UART_BAUDRATE	9600
 #define GPS_UART_SRCCLK		CLOCK_GetBusClkFreq()

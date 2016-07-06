@@ -8,6 +8,7 @@
  *      Author: Visakhan
  */
 
+#include "common.h"
 #include "gsm_common.h"
 #include "http_utils.h"
 #include "num_utils.h"
@@ -30,8 +31,8 @@ static float cur_lat;
 static float cur_lon;
 static char page_buf[256];
 static uint8_t gsm_tx_buf[200];
-static char maps_api_url[100] = "http://maps.googleapis.com/maps/api/geocode/json?latlng=12.92736,77.60729";
-#define URL_OFFSET  56
+static char maps_api_url[100] = MAPS_API_URL;
+#define URL_OFFSET  (sizeof(MAPS_API_URL)-1)
 
 
 void message_task(void *pArg)

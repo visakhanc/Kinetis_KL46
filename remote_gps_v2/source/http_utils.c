@@ -39,7 +39,6 @@ int http_get(const char *url)
 	strcpy(url_cmd_buf, "AT+HTTPPARA=\"URL\",\"");
 	strcat(url_cmd_buf, url);
 	strcat(url_cmd_buf, "\"");
-	//http://maps.googleapis.com/maps/api/geocode/json?latlng=12.92736,77.60729"12.927281,77.607330
 
 	gsm_send_command(url_cmd_buf);
 	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 4*1000);
