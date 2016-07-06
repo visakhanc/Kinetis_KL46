@@ -15,6 +15,7 @@ extern int http_open_context(void);
 extern int http_close_context(void);
 extern int http_init(void);
 extern int http_terminate(void);
+int http_read(uint8_t *buf, int offset, int size);
 extern int http_find_string(const char* str, uint8_t *page_buf, int bufsize);
 extern int gprs_configure(void);
 

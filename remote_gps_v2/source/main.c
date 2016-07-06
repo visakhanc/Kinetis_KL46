@@ -96,6 +96,7 @@ int main(void) {
   BOARD_BootClockRUN();
   BOARD_InitDebugConsole();
 
+
   /* Initialize LEDs to OFF state */
   LED_RED_INIT(LOGIC_LED_OFF);
   LED_GREEN_INIT(LOGIC_LED_OFF);

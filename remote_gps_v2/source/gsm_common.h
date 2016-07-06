@@ -37,9 +37,10 @@ typedef struct _gsm_status
 {
 	volatile bool registerd;
 	volatile bool gprs_context;
-	int http_status;
-	int http_recv_len;
-	int http_read_count;
+	//volatile int cid;
+	volatile int http_status;
+	volatile int http_recv_len;
+	//volatile int http_read_count;
 	uint8_t caller[15];
 } gsm_status_struct, *gsm_status_struct_ptr;
 

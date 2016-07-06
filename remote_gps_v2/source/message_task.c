@@ -48,7 +48,7 @@ void message_task(void *pArg)
 
 	do {
 		gsm_send_command("AT");
-		ev = gsm_wait_for_event(EVENT_GSM_OK, 1000); // TODO: change to 100 ticks
+		ev = gsm_wait_for_event(EVENT_GSM_OK, 1000);
 	} while (!(ev & EVENT_GSM_OK));
 
 	/* Disable AT echo */
