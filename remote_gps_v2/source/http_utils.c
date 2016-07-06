@@ -16,7 +16,7 @@ extern char http_buf[];
 
 #define URL_MAX_SIZE  170
 static char url_cmd_buf[200];
-static bool http_initialized = false;
+volatile static bool http_initialized = false;
 
 /* Description 	:	Use SIM900 HTTP GET feature to send GET request to given URL
  * Arguments 	: 	url - Null terminated URL string
@@ -36,36 +36,21 @@ int http_get(const char *url)
 		return 1;
 	}
 
-	if(0 == ret) {
-		gsm_send_command("AT+HTTPPARA=\"CID\",1");
-		ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-		if(ev & EVENT_GSM_ERROR) {
-			PRINTF("\n\rERROR: CID error");
-			ret = 1;
-		}
-		else if(!(ev & EVENT_GSM_OK)) {
-			ret = 1;
-			PRINTF("\n\rERRO: CID timout");
-		}
+	strcpy(url_cmd_buf, "AT+HTTPPARA=\"URL\",\"");
+	strcat(url_cmd_buf, url);
+	strcat(url_cmd_buf, "\"");
+	//http://maps.googleapis.com/maps/api/geocode/json?latlng=12.92736,77.60729"12.927281,77.607330
+
+	gsm_send_command(url_cmd_buf);
+	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 4*1000);
+	if(ev & EVENT_GSM_ERROR) {
+		PRINTF("\n\rURL error");
+		PRINTF("\n\r%s", url_cmd_buf);
+		ret = 1;
 	}
-
-	if(0 == ret) {
-		strcpy(url_cmd_buf, "AT+HTTPPARA=\"URL\",\"");
-		strcat(url_cmd_buf, url);
-		strcat(url_cmd_buf, "\"");
-		//http://maps.googleapis.com/maps/api/geocode/json?latlng=12.92736,77.60729"12.927281,77.607330
-
-		gsm_send_command(url_cmd_buf);
-		ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 4*1000);
-		if(ev & EVENT_GSM_ERROR) {
-			PRINTF("\n\rURL error");
-			PRINTF("\n\r%s", url_cmd_buf);
-			ret = 1;
-		}
-		else if(!(ev & EVENT_GSM_OK)){
-			PRINTF("\n\rURL timeout");
-			ret = 1;
-		}
+	else if(!(ev & EVENT_GSM_OK)){
+		PRINTF("\n\rURL timeout");
+		ret = 1;
 	}
 
 	if(0 == ret) {
@@ -160,8 +145,6 @@ int http_open_context(void)
 	}
 
 	PRINTF("\n\rgprs opened");
-
-
 	return 0;
 }
 
@@ -208,7 +191,6 @@ int http_init(void)
 
 	gsm_send_command("AT+HTTPINIT");
 	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
-
 	if(ev & EVENT_GSM_ERROR) {
 		PRINTF("\n\rHTTPINIT error");
 		ret = 1;
@@ -217,14 +199,29 @@ int http_init(void)
 		PRINTF("\n\rhttp init timeout");
 		ret = 1;
 	}
+	else {
+		http_initialized = true;
+	}
 
-	http_initialized = true;
+	/* Set context ID */
+	gsm_send_command("AT+HTTPPARA=\"CID\",1");
+	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2*1000);
+	if(ev & EVENT_GSM_ERROR) {
+		PRINTF("\n\rERROR: CID error");
+		ret = 1;
+	}
+	else if(!(ev & EVENT_GSM_OK)) {
+		ret = 1;
+		PRINTF("\n\rERROR: CID timout");
+	}
+
 	return ret;
 }
 
 
 int http_terminate(void)
 {
+	int ret = 0;
 	EventBits_t ev;
 
 	if(false == http_initialized) {
@@ -236,14 +233,17 @@ int http_terminate(void)
 	ev = gsm_wait_for_event(EVENT_GSM_OK|EVENT_GSM_ERROR, 2000);
 	if(ev & EVENT_GSM_ERROR) {
 		PRINTF("\n\rhttpterm error");
-		return 1;
+		ret = 1;
 	}
 	else if(!(ev & EVENT_GSM_OK)) {
 		PRINTF("\r\nhttpterm timeout");
+		ret = 1;
+	}
+	else {
+		http_initialized = false;
 	}
 
-	http_initialized = false;
-	return 0;
+	return ret;
 }
 
 
@@ -278,7 +278,7 @@ int http_read(uint8_t *buf, int offset, int size)
 
 /* Look for the given string in the received HTTP page in SIM900 internal buffer
  * If found, 'page_buf is filled with content from the received page, starting with
- * given string upto either end of the page or the size of 'page_buf' ('bufsize')
+ * given string upto either end of the page or the size of page_buf ('bufsize')
  */
 int http_find_string(const char* str, uint8_t *page_buf, int bufsize)
 {
