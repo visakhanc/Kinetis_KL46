@@ -319,43 +319,48 @@ void gsm_rx_task(void *pArg)
 
 		/* Wait for signal from UART Rx handler */
 		if(ulTaskNotifyTake(pdTRUE, portMAX_DELAY) == 1) {
-
+			/* Copy GSM response string to local buffer */
 			len = gsm_rx_len;
+			if(len >= sizeof(rx_buf)) {
+				continue;
+			}
 			memcpy((void *) rx_buf, (const void *) gsm_rx_buf, len);
+			rx_buf[len] = '\0';
+
 #if GSM_DEBUG
-			PRINTF("%s\r\n", gsm_rx_buf);
+			PRINTF("%s\r\n", rx_buf);
 #endif
 			/* Response of 2 characters */
 			if (2 == len) {
-				if (0 == strcmp((char *)gsm_rx_buf, "OK")) { // TODO: use rx_buf to compare
+				if (0 == strcmp((char *)rx_buf, "OK")) { // TODO: use rx_buf to compare
 					xEventGroupSetBits(xGsmEvent, EVENT_GSM_OK);
 				}
 			}
 			/* Response of 4 characters */
 			else if (4 == len) {
-				if (0 == strcmp((char *)gsm_rx_buf, "RING")) {
+				if (0 == strcmp((char *)rx_buf, "RING")) {
 					xEventGroupSetBits(xGsmEvent, EVENT_GSM_RING);
 				}
 			}
 			/* Response of 5 characters */
 			else if (5 == len) {
-				if (0 == strcmp((char *)gsm_rx_buf, "ERROR")) {
+				if (0 == strcmp((char *)rx_buf, "ERROR")) {
 					xEventGroupSetBits(xGsmEvent, EVENT_GSM_ERROR);
 				}
 			}
 			/* Others */
 			else {
-				if (NULL != strstr((char *)gsm_rx_buf, "+CLIP")) {
+				if (NULL != strstr((char *)rx_buf, "+CLIP")) {
 					/* Get the caller number from CLIP line */
-					len = get_quoted_string(&gsm_rx_buf[7], gsm_status.caller, sizeof(gsm_status.caller));
+					len = get_quoted_string(&rx_buf[7], gsm_status.caller, sizeof(gsm_status.caller));
 					if (len > 0) {
 						xEventGroupSetBits(xGsmEvent, EVENT_GSM_CLIP);
 					}
 				}
 
-				if (NULL != strstr((char *)gsm_rx_buf, "+CREG")) {
+				if (NULL != strstr((char *)rx_buf, "+CREG")) {
 					/* Get and update registration status */
-					if ((gsm_rx_buf[9] == '1') || (gsm_rx_buf[9] == '5')) {
+					if ((rx_buf[9] == '1') || (rx_buf[9] == '5')) {
 						gsm_status.registerd = true;
 						xEventGroupSetBits(xGsmEvent, EVENT_GSM_CREG);
 					}
@@ -364,33 +369,28 @@ void gsm_rx_task(void *pArg)
 					}
 				}
 
-				if (NULL != strstr((char *)gsm_rx_buf, "+HTTPACTION")) {
+				if (NULL != strstr((char *)rx_buf, "+HTTPACTION")) {
 					/* Get HTTP receive status and size of data received */
-					parse_decimal(&temp, (char *)&gsm_rx_buf[14], 3);
+					parse_decimal(&temp, (char *)&rx_buf[14], 3);
 					if (temp == 200) {
-						parse_decimal(&gsm_status.http_recv_len, (char *)&gsm_rx_buf[18], 5);
+						parse_decimal(&gsm_status.http_recv_len, (char *)&rx_buf[18], 5);
 					}
 					gsm_status.http_status = temp;
 
 					xEventGroupSetBits(xGsmEvent, EVENT_GSM_HTTPACTION);
 				}
 
-				if (NULL != strstr((char *)gsm_rx_buf, "+HTTPREAD")) {
+				if (NULL != strstr((char *)rx_buf, "+HTTPREAD")) {
 					/* get number of bytes going to be received */
-					parse_decimal(&temp, (char *)&gsm_rx_buf[10], 5);
+					parse_decimal(&temp, (char *)&rx_buf[10], 5);
 					http_buf_count = temp;
 
 					/* Tell UART Rx handler to receive characters to http buffer */
 					http_buf_switch = true;
 				}
 
-				if (NULL != strstr((char *)gsm_rx_buf, "+SAPBR")) {
-					if (gsm_rx_buf[10] == '3') {
-						gsm_status.gprs_context = false;
-					}
-					else if (gsm_rx_buf[10] == '1') {
-						gsm_status.gprs_context = true;
-					}
+				if (NULL != strstr((char *)rx_buf, "+SAPBR")) {
+					gsm_status.gprs_context = (rx_buf[10] == '1') ? true : false;
 				}
 
 			}
